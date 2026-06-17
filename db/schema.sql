@@ -58,6 +58,7 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
+  -- 1. Insert into public.users
   insert into public.users (id, email, full_name, avatar_url, bio, role, goals, github_url, linkedin_url)
   values (
     new.id,
@@ -70,6 +71,31 @@ begin
     new.raw_user_meta_data->>'github_url',
     new.raw_user_meta_data->>'linkedin_url'
   );
+
+  -- 2. Insert into public.profiles
+  insert into public.profiles (
+    id, full_name, role, bio, avatar_url, 
+    skills, github_url, linkedin_url, goals, 
+    company_name, years_of_experience, availability_status, 
+    timezone, portfolio_url
+  )
+  values (
+    new.id,
+    new.raw_user_meta_data->>'full_name',
+    new.raw_user_meta_data->>'role',
+    new.raw_user_meta_data->>'bio',
+    new.raw_user_meta_data->>'avatar_url',
+    ARRAY(SELECT jsonb_array_elements_text(COALESCE(new.raw_user_meta_data->'skills', '[]'::jsonb))),
+    new.raw_user_meta_data->>'github_url',
+    new.raw_user_meta_data->>'linkedin_url',
+    new.raw_user_meta_data->>'goals',
+    new.raw_user_meta_data->>'company_name',
+    NULLIF(new.raw_user_meta_data->>'years_of_experience', '')::integer,
+    new.raw_user_meta_data->>'availability_status',
+    new.raw_user_meta_data->>'timezone',
+    new.raw_user_meta_data->>'portfolio_url'
+  );
+
   return new;
 end;
 $$;
