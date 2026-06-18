@@ -92,9 +92,9 @@ exports.getFeed = async (req, res) => {
       const hours = Math.floor(minutes / 60);
       const days = Math.floor(hours / 24);
       let timestamp = 'Just now';
-      if (minutes > 0) {timestamp = `${minutes}m ago`;}
-      if (hours > 0) {timestamp = `${hours}h ago`;}
-      if (days > 0) {timestamp = `${days}d ago`;}
+      if (minutes > 0) { timestamp = `${minutes}m ago`; }
+      if (hours > 0) { timestamp = `${hours}h ago`; }
+      if (days > 0) { timestamp = `${days}d ago`; }
 
       return {
         id: post.id,
@@ -170,9 +170,9 @@ exports.getComments = async (req, res) => {
       const hours = Math.floor(minutes / 60);
       const days = Math.floor(hours / 24);
       let time = 'Just now';
-      if (minutes > 0) {time = `${minutes}m`;}
-      if (hours > 0) {time = `${hours}h`;}
-      if (days > 0) {time = `${days}d`;}
+      if (minutes > 0) { time = `${minutes}m`; }
+      if (hours > 0) { time = `${hours}h`; }
+      if (days > 0) { time = `${days}d`; }
       return {
         id: c.id,
         userId: c.user_id,
@@ -221,6 +221,67 @@ exports.addComment = async (req, res) => {
     });
   } catch (error) {
     console.error('[addComment] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getUserPosts = async (req, res) => {
+  const { userId } = req.params;
+  console.log('[getUserPosts] for user:', userId);
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        profiles:user_id(id, full_name, avatar_url, role),
+        post_likes(count),
+        post_comments(count)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (error) throw error;
+
+    let userLikes = new Set();
+    if (req.user && data.length > 0) {
+      const { data: likesData } = await supabase
+        .from('post_likes')
+        .select('post_id')
+        .eq('user_id', req.user.id)
+        .in('post_id', data.map(p => p.id));
+      if (likesData) likesData.forEach(l => userLikes.add(l.post_id));
+    }
+
+    const formatted = data.map(post => {
+      const diff = Date.now() - new Date(post.created_at).getTime();
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+      let timestamp = 'Just now';
+      if (minutes > 0) { timestamp = `${minutes}m ago`; }
+      if (hours > 0) { timestamp = `${hours}h ago`; }
+      if (days > 0) { timestamp = `${days}d ago`; }
+
+      return {
+        id: post.id,
+        userId: post.user_id,
+        userName: post.profiles?.full_name || 'User',
+        userRole: post.profiles?.role || 'Member',
+        initials: (post.profiles?.full_name || 'U').substring(0, 2).toUpperCase(),
+        color: '#3498db',
+        content: post.content,
+        tags: post.tags || [],
+        likes: Number(post.post_likes?.[0]?.count ?? 0),
+        comments: Number(post.post_comments?.[0]?.count ?? 0),
+        timestamp,
+        liked: req.user ? userLikes.has(post.id) : false,
+      };
+    });
+
+    res.json(formatted);
+  } catch (error) {
+    console.error('[getUserPosts] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 };

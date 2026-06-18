@@ -7,13 +7,23 @@ const userRoutes = require('./routes/users.routes');
 const postRoutes = require('./routes/posts.routes');
 const connectionRoutes = require('./routes/connections.routes');
 const webhookRoutes = require('./routes/webhooks.routes');
+const notificationRoutes = require('./routes/notifications.routes');
+const conversationsRoutes = require('./routes/conversations.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Disable ETag so API routes always return 200 (not 304 Not Modified)
+app.set('etag', false);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+// No-cache header for all /api routes
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 
 // ── Request Logger ────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -43,7 +53,9 @@ app.get('/health', (req, res) => {
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/connections', connectionRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/conversations', conversationsRoutes);
 
 // ── Global Error Handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
